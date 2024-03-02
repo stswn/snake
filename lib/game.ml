@@ -1,6 +1,6 @@
 type state = Waiting | Started | Paused | GameOver [@@deriving show]
 type cell = { x : int; y : int } [@@deriving show]
-type direction = Left | Up | Right | Down [@@deriving show]
+type direction = Left | Up | Right | Down [@@deriving show, enum]
 type snake = cell list [@@deriving show]
 
 type t = {
@@ -8,10 +8,12 @@ type t = {
   height : int;
   state : state;
   round : int;
-  direction : direction;
+  current_direction : direction;
+  next_direction : direction;
   snake : cell list;
   food : cell;
-} [@@deriving show]
+}
+[@@deriving show]
 
 (* Finds free cell to put food  or initial snake in *)
 let find_free_cell width height occupied =
@@ -31,10 +33,20 @@ let find_free_cell width height occupied =
   find_cell { x = 0; y = 0 } start_idx
 
 let init ~width ~height =
-  let snake_start = Option.get @@ find_free_cell width height [] in
+  let snake_start = find_free_cell width height [] |> Option.get in
   let snake = [ snake_start ] in
-  let food = Option.get @@ find_free_cell width height snake in
-  { width; height; state = Waiting; round = 1; direction = Right; snake; food }
+  let food = find_free_cell width height snake |> Option.get in
+  let direction = Random.int 4 |> direction_of_enum |> Option.get in
+  {
+    width;
+    height;
+    state = Waiting;
+    round = 1;
+    current_direction = direction;
+    next_direction = direction;
+    snake;
+    food;
+  }
 
 let start game =
   match game.state with Waiting -> { game with state = Started } | _ -> game
@@ -42,8 +54,23 @@ let start game =
 let when_started game updated_game =
   match game.state with Started -> updated_game | _ -> game
 
-let change_direction game direction =
-  when_started game @@ { game with direction }
+let turn_right game =
+  when_started game
+  @@
+  let next_direction =
+    (direction_to_enum game.current_direction + 1) mod 4
+    |> direction_of_enum |> Option.get
+  in
+  { game with next_direction }
+
+let turn_left game =
+  when_started game
+  @@
+  let next_direction =
+    (direction_to_enum game.current_direction + 5) mod 4
+    |> direction_of_enum |> Option.get
+  in
+  { game with next_direction }
 
 let set_paused game paused =
   match (game, paused) with
@@ -63,14 +90,14 @@ let drop_last snake =
     | _ :: [], acc -> acc
     | x :: xs, acc -> drop_last_reversed xs (x :: acc)
   in
-  List.rev @@ drop_last_reversed snake []
+  drop_last_reversed snake [] |> List.rev
 
 let advance game =
   when_started game
   @@
   let current_head = List.hd game.snake in
   let next_head =
-    match game.direction with
+    match game.next_direction with
     | Left -> { current_head with x = nmod (current_head.x - 1) game.width }
     | Up -> { current_head with y = nmod (current_head.y - 1) game.height }
     | Down -> { current_head with y = nmod (current_head.y + 1) game.height }
@@ -81,13 +108,24 @@ let advance game =
     let new_snake = next_head :: game.snake in
     match find_free_cell game.width game.height new_snake with
     | Some new_food ->
-        { game with snake = new_snake; food = new_food; round = next_round }
+        {
+          game with
+          snake = new_snake;
+          food = new_food;
+          current_direction = game.next_direction;
+          round = next_round;
+        }
     | None -> { game with state = GameOver; round = next_round }
   else if List.exists (fun c -> c = next_head) game.snake then
     { game with state = GameOver; round = next_round }
   else
     let new_snake = drop_last (next_head :: game.snake) in
-    { game with snake = new_snake; round = next_round }
+    {
+      game with
+      snake = new_snake;
+      current_direction = game.next_direction;
+      round = next_round;
+    }
 
 let get_round game = game.round
 let get_points game = List.length game.snake - 1

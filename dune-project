@@ -14,7 +14,7 @@
  (name snake)
  (synopsis "Snake game")
  (description "Toy project implementing game of Snake using Raylib")
- (depends ocaml dune raylib ppx_show)
+ (depends ocaml dune raylib ppx_deriving)
  (tags
   (topics raylib snake game)))
 

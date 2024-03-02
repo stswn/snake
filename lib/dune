@@ -1,4 +1,4 @@
 (library
  (name snake)
- (preprocess (pps ppx_show))
- (libraries ppx_show.runtime))
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.enum)))
