@@ -1,17 +1,24 @@
 type state = Waiting | Started | Paused | GameOver [@@deriving show]
 type cell = { x : int; y : int } [@@deriving show]
-type direction = Left | Up | Right | Down [@@deriving show, enum]
 type snake = cell list [@@deriving show]
+
+[@@@warning "-32"]
+
+type direction = Left | Up | Right | Down [@@deriving show, enum]
+
+[@@@warning "+32"]
+
+type command = TurnLeft | TurnRight [@@deriving show]
 
 type t = {
   width : int;
   height : int;
   state : state;
   round : int;
-  current_direction : direction;
-  next_direction : direction;
+  direction : direction;
   snake : cell list;
   food : cell;
+  commands : command list;
 }
 [@@deriving show]
 
@@ -42,10 +49,10 @@ let init ~width ~height =
     height;
     state = Waiting;
     round = 1;
-    current_direction = direction;
-    next_direction = direction;
+    direction;
     snake;
     food;
+    commands = [];
   }
 
 let start game =
@@ -55,22 +62,10 @@ let when_started game updated_game =
   match game.state with Started -> updated_game | _ -> game
 
 let turn_right game =
-  when_started game
-  @@
-  let next_direction =
-    (direction_to_enum game.current_direction + 1) mod 4
-    |> direction_of_enum |> Option.get
-  in
-  { game with next_direction }
+  when_started game @@ { game with commands = game.commands @ [ TurnRight ] }
 
 let turn_left game =
-  when_started game
-  @@
-  let next_direction =
-    (direction_to_enum game.current_direction + 5) mod 4
-    |> direction_of_enum |> Option.get
-  in
-  { game with next_direction }
+  when_started game @@ { game with commands = game.commands @ [ TurnLeft ] }
 
 let set_paused game paused =
   match (game, paused) with
@@ -92,12 +87,24 @@ let drop_last snake =
   in
   drop_last_reversed snake [] |> List.rev
 
+let next_direction current_direction command =
+  let rot =
+    match command with Some TurnRight -> 1 | Some TurnLeft -> 3 | None -> 0
+  in
+  (direction_to_enum current_direction + rot) mod 4
+  |> direction_of_enum |> Option.get
+
+let hd_opt = function [] -> Option.none | x :: _ -> Option.some x
+let tl_sf = function [] -> [] | _ :: xs -> xs
+
 let advance game =
   when_started game
   @@
   let current_head = List.hd game.snake in
+  let command = hd_opt game.commands in
+  let direction = next_direction game.direction command in
   let next_head =
-    match game.next_direction with
+    match direction with
     | Left -> { current_head with x = nmod (current_head.x - 1) game.width }
     | Up -> { current_head with y = nmod (current_head.y - 1) game.height }
     | Down -> { current_head with y = nmod (current_head.y + 1) game.height }
@@ -110,10 +117,11 @@ let advance game =
     | Some new_food ->
         {
           game with
+          direction;
           snake = new_snake;
           food = new_food;
-          current_direction = game.next_direction;
           round = next_round;
+          commands = tl_sf game.commands;
         }
     | None -> { game with state = GameOver; round = next_round }
   else if List.exists (fun c -> c = next_head) game.snake then
@@ -122,10 +130,12 @@ let advance game =
     let new_snake = drop_last (next_head :: game.snake) in
     {
       game with
+      direction;
       snake = new_snake;
-      current_direction = game.next_direction;
       round = next_round;
+      commands = tl_sf game.commands;
     }
 
+let get_state game = game.state
 let get_round game = game.round
 let get_points game = List.length game.snake - 1
