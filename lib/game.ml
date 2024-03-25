@@ -9,6 +9,8 @@ type direction = Left | Up | Right | Down [@@deriving show, enum]
 [@@@warning "+32"]
 
 type command = TurnLeft | TurnRight [@@deriving show]
+type field = Empty | Food | Snake [@@deriving show]
+type board = field array array [@@deriving show]
 
 type t = {
   width : int;
@@ -67,7 +69,7 @@ let turn_right game =
 let turn_left game =
   when_started game @@ { game with commands = game.commands @ [ TurnLeft ] }
 
-let set_paused game paused =
+let set_paused paused game =
   match (game, paused) with
   | ({ state = Started; _ } as s), true -> { s with state = Paused }
   | ({ state = Paused; _ } as s), false -> { s with state = Started }
@@ -76,6 +78,13 @@ let set_paused game paused =
 let get_paused game = game.state = Paused
 let get_snake game = game.snake
 let get_food game = game.food
+
+let get_board game =
+  let board = Array.make_matrix game.width game.height Empty in
+  board.(game.food.x).(game.food.y) <- Food;
+  List.iter (fun s -> board.(s.x).(s.y) <- Snake) game.snake;
+  board
+
 let nmod x y = ((x mod y) + y) mod y
 
 let drop_last snake =
@@ -138,4 +147,4 @@ let advance game =
 
 let get_state game = game.state
 let get_round game = game.round
-let get_points game = List.length game.snake - 1
+let get_points game = List.length game.snake
