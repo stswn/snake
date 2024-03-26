@@ -1,12 +1,12 @@
 module R = Raylib
 module G = Snake.Game
 
-let board_width = 80
-let board_height = 40
+let board_width = 40
+let board_height = 30
 let field_size = 40
 let status_x = 60
 let status_y = 60
-(* let turn_length = 1.0 *)
+let turn_length = 0.2
 
 let setup () =
   R.init_window (board_width * field_size) (board_height * field_size) "Snake"
@@ -61,10 +61,14 @@ let handle_input game =
 let rec loop game elapsed =
   if R.window_should_close () then R.close_window () else draw game;
   let game = handle_input game in
-  loop game elapsed
+  let new_elapsed = elapsed +. R.get_frame_time () in
+  if new_elapsed >= turn_length then
+    let game = game |> G.advance in
+    loop game (turn_length -. new_elapsed)
+  else loop game new_elapsed
 
 let () =
   Random.self_init ();
   let game = G.init ~width:board_width ~height:board_height in
   setup ();
-  loop game 0
+  loop game 0.0
