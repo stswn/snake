@@ -1,4 +1,5 @@
 (library
  (name snake)
+ (inline_tests)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.enum)))
+  (pps ppx_deriving.show ppx_deriving.enum ppx_inline_test)))

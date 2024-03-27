@@ -25,21 +25,40 @@ type t = {
 [@@deriving show]
 
 (* Finds free cell to put food  or initial snake in *)
-let find_free_cell width height occupied =
+let find_free_cell ?(random_int = Random.int) width height occupied =
   let free_cells = (width * height) - List.length occupied in
-  let start_idx = Random.int free_cells in
-  let rec find_cell cell idx =
-    let cell_occupied = List.exists (fun c -> c = cell) occupied in
-    match idx with
-    | 0 -> if cell_occupied then Option.none else Option.some cell
-    | _ ->
-        if cell.x < width - 1 then
-          find_cell { cell with x = cell.x + 1 } (idx - 1)
-        else if cell.y < height - 1 then
-          find_cell { x = 0; y = cell.y + 1 } (idx - 1)
-        else find_cell { x = 0; y = 0 } (idx - 1)
-  in
-  find_cell { x = 0; y = 0 } start_idx
+  if free_cells <= 0 then Option.none
+  else
+    let start_idx = random_int free_cells in
+    let rec find_cell cell idx =
+      let cell_occupied = List.exists (fun c -> c = cell) occupied in
+      let next_cell =
+        if cell.x < width - 1 then { cell with x = cell.x + 1 }
+        else if cell.y < height - 1 then { x = 0; y = cell.y + 1 }
+        else { x = 0; y = 0 }
+      in
+      if cell_occupied then find_cell next_cell idx
+      else if idx = 0 then cell
+      else find_cell next_cell (idx - 1)
+    in
+    Option.some @@ find_cell { x = 0; y = 0 } start_idx
+
+let%test "no free cells" =
+  find_free_cell 2 2
+    [ { x = 0; y = 0 }; { x = 0; y = 1 }; { x = 1; y = 0 }; { x = 1; y = 1 } ]
+  = Option.none
+
+let%test "last free cell" =
+  find_free_cell 2 2 [ { x = 0; y = 0 }; { x = 0; y = 1 }; { x = 1; y = 0 } ]
+  = Option.some { x = 1; y = 1 }
+
+let%test "omit occupied cells (0)" =
+  find_free_cell ~random_int:(fun _ -> 0) 2 2 [ { x = 0; y = 0 } ]
+  = Option.some { x = 1; y = 0 }
+
+let%test "omit occupied cells (1)" =
+  find_free_cell ~random_int:(fun _ -> 1) 2 2 [ { x = 1; y = 0 } ]
+  = Option.some { x = 0; y = 1 }
 
 let init ~width ~height =
   let snake_start = find_free_cell width height [] |> Option.get in
